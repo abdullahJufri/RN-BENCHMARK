@@ -94,6 +94,162 @@ const PENGHASILAN_OPTIONS = [
   '> Rp 20.000.000',
 ];
 
+// === MEMOIZED SUB-COMPONENTS (Zero re-render for unaffected fields) ===
+
+interface FormFieldRNProps {
+  label: string;
+  name: keyof FormData;
+  value: string;
+  error?: string;
+  placeholder?: string;
+  onChange: (fieldName: keyof FormData, text: string) => void;
+  keyboardType?: 'default' | 'numeric' | 'phone-pad' | 'email-address';
+  maxLength?: number;
+  multiline?: boolean;
+  numberOfLines?: number;
+}
+
+const FormFieldRN = React.memo<FormFieldRNProps>(({
+  label,
+  name,
+  value,
+  error,
+  placeholder,
+  onChange,
+  keyboardType = 'default',
+  maxLength,
+  multiline = false,
+  numberOfLines = 1,
+}) => {
+  const handleChange = useCallback((text: string) => {
+    onChange(name, text);
+  }, [name, onChange]);
+
+  return (
+    <View style={styles.fieldContainer}>
+      <Text style={styles.fieldLabel}>{label}</Text>
+      <TextInput
+        style={[
+          styles.textInput,
+          error ? styles.textInputError : null,
+          multiline ? { height: numberOfLines * 40, textAlignVertical: 'top' } : null,
+        ]}
+        value={value}
+        onChangeText={handleChange}
+        placeholder={placeholder}
+        placeholderTextColor="#999"
+        keyboardType={keyboardType}
+        maxLength={maxLength}
+        multiline={multiline}
+        numberOfLines={numberOfLines}
+      />
+      {error && <Text style={styles.errorText}>{error}</Text>}
+    </View>
+  );
+});
+
+interface DropdownPickerProps {
+  label: string;
+  name: keyof FormData;
+  value: string;
+  options: string[];
+  isOpen: boolean;
+  onToggle: (name: string) => void;
+  onSelect: (name: keyof FormData, option: string) => void;
+}
+
+const DropdownPicker = React.memo<DropdownPickerProps>(({
+  label,
+  name,
+  value,
+  options,
+  isOpen,
+  onToggle,
+  onSelect,
+}) => {
+  const handleToggle = useCallback(() => {
+    onToggle(name);
+  }, [name, onToggle]);
+
+  return (
+    <View style={styles.fieldContainer}>
+      <Text style={styles.fieldLabel}>{label}</Text>
+      <TouchableOpacity
+        style={styles.dropdownButton}
+        onPress={handleToggle}
+      >
+        <Text
+          style={[
+            styles.dropdownText,
+            !value && styles.placeholderText,
+          ]}
+        >
+          {value || `Pilih ${label}`}
+        </Text>
+        <Text>▼</Text>
+      </TouchableOpacity>
+      {isOpen && (
+        <View style={styles.dropdownList}>
+          {options.map((option) => (
+            <TouchableOpacity
+              key={option}
+              style={styles.dropdownItem}
+              onPress={() => onSelect(name, option)}
+            >
+              <Text style={styles.dropdownItemText}>{option}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+    </View>
+  );
+});
+
+interface RadioGroupProps {
+  label: string;
+  name: keyof FormData;
+  value: string;
+  options: string[];
+  onSelect: (name: keyof FormData, option: string) => void;
+}
+
+const RadioGroup = React.memo<RadioGroupProps>(({
+  label,
+  name,
+  value,
+  options,
+  onSelect,
+}) => {
+  return (
+    <View style={styles.fieldContainer}>
+      <Text style={styles.fieldLabel}>{label}</Text>
+      <View style={styles.radioGroup}>
+        {options.map((option) => (
+          <TouchableOpacity
+            key={option}
+            style={styles.radioOption}
+            onPress={() => onSelect(name, option)}
+          >
+            <View
+              style={[
+                styles.radio,
+                value === option && styles.radioSelected,
+              ]}
+            >
+              {value === option && (
+                <View style={styles.radioInner} />
+              )}
+            </View>
+            <Text style={styles.radioLabel}>{option}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    </View>
+  );
+});
+
+// === MAIN SCREEN ===
+
 const FormBenchmarkScreen: React.FC = () => {
   const [formData, setFormData] = useState<FormData>(INITIAL_FORM);
   const [errors, setErrors] = useState<FormErrors>({});
@@ -106,7 +262,6 @@ const FormBenchmarkScreen: React.FC = () => {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [showDropdown, setShowDropdown] = useState<string | null>(null);
   const renderStartRef = useRef<number>(Date.now());
-
   const isInitialMount = useRef(true);
 
   // Track re-renders only when formData changes (user interaction)
@@ -184,6 +339,18 @@ const FormBenchmarkScreen: React.FC = () => {
     [validateField]
   );
 
+  const handleToggleDropdown = useCallback((name: string) => {
+    setShowDropdown((prev) => (prev === name ? null : name));
+  }, []);
+
+  const handleSelectDropdown = useCallback(
+    (name: keyof FormData, option: string) => {
+      updateField(name, option);
+      setShowDropdown(null);
+    },
+    [updateField]
+  );
+
   const handleSubmit = useCallback(() => {
     const hasError =
       formData.nik.length !== 16 ||
@@ -199,79 +366,6 @@ const FormBenchmarkScreen: React.FC = () => {
       setIsSubmitted(true);
     }
   }, [formData]);
-
-  const DropdownPicker: React.FC<{
-    label: string;
-    fieldName: keyof FormData;
-    options: string[];
-  }> = ({ label, fieldName, options }) => (
-    <View style={styles.fieldContainer}>
-      <Text style={styles.fieldLabel}>{label}</Text>
-      <TouchableOpacity
-        style={styles.dropdownButton}
-        onPress={() =>
-          setShowDropdown(showDropdown === fieldName ? null : fieldName)
-        }
-      >
-        <Text
-          style={[
-            styles.dropdownText,
-            !formData[fieldName] && styles.placeholderText,
-          ]}
-        >
-          {formData[fieldName] || `Pilih ${label}`}
-        </Text>
-        <Text>▼</Text>
-      </TouchableOpacity>
-      {showDropdown === fieldName && (
-        <View style={styles.dropdownList}>
-          {options.map((option) => (
-            <TouchableOpacity
-              key={option}
-              style={styles.dropdownItem}
-              onPress={() => {
-                updateField(fieldName, option);
-                setShowDropdown(null);
-              }}
-            >
-              <Text style={styles.dropdownItemText}>{option}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      )}
-    </View>
-  );
-
-  const RadioGroup: React.FC<{
-    label: string;
-    fieldName: keyof FormData;
-    options: string[];
-  }> = ({ label, fieldName, options }) => (
-    <View style={styles.fieldContainer}>
-      <Text style={styles.fieldLabel}>{label}</Text>
-      <View style={styles.radioGroup}>
-        {options.map((option) => (
-          <TouchableOpacity
-            key={option}
-            style={styles.radioOption}
-            onPress={() => updateField(fieldName, option)}
-          >
-            <View
-              style={[
-                styles.radio,
-                formData[fieldName] === option && styles.radioSelected,
-              ]}
-            >
-              {formData[fieldName] === option && (
-                <View style={styles.radioInner} />
-              )}
-            </View>
-            <Text style={styles.radioLabel}>{option}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-    </View>
-  );
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
@@ -305,39 +399,45 @@ const FormBenchmarkScreen: React.FC = () => {
 
       <FormFieldRN
         label="NIK"
+        name="nik"
         value={formData.nik}
         error={errors.nik}
         placeholder="Masukkan 16 digit NIK"
-        onChangeText={(v) => updateField('nik', v)}
+        onChange={updateField}
         keyboardType="numeric"
         maxLength={16}
       />
       <FormFieldRN
         label="Nama Lengkap"
+        name="namaLengkap"
         value={formData.namaLengkap}
         error={errors.namaLengkap}
         placeholder="Masukkan nama lengkap"
-        onChangeText={(v) => updateField('namaLengkap', v)}
+        onChange={updateField}
       />
       <FormFieldRN
         label="Tempat Lahir"
+        name="tempatLahir"
         value={formData.tempatLahir}
         error={errors.tempatLahir}
         placeholder="Masukkan tempat lahir"
-        onChangeText={(v) => updateField('tempatLahir', v)}
+        onChange={updateField}
       />
       <FormFieldRN
         label="Tanggal Lahir"
+        name="tanggalLahir"
         value={formData.tanggalLahir}
         error={errors.tanggalLahir}
         placeholder="DD/MM/YYYY"
-        onChangeText={(v) => updateField('tanggalLahir', v)}
+        onChange={updateField}
       />
 
       <RadioGroup
         label="Jenis Kelamin"
-        fieldName="jenisKelamin"
+        name="jenisKelamin"
+        value={formData.jenisKelamin}
         options={['Laki-laki', 'Perempuan']}
+        onSelect={updateField}
       />
 
       {/* === Alamat === */}
@@ -345,10 +445,11 @@ const FormBenchmarkScreen: React.FC = () => {
 
       <FormFieldRN
         label="Alamat Lengkap"
+        name="alamat"
         value={formData.alamat}
         error={errors.alamat}
         placeholder="Masukkan alamat lengkap"
-        onChangeText={(v) => updateField('alamat', v)}
+        onChange={updateField}
         multiline
         numberOfLines={3}
       />
@@ -357,10 +458,11 @@ const FormBenchmarkScreen: React.FC = () => {
         <View style={{ flex: 1, marginRight: 6 }}>
           <FormFieldRN
             label="RT"
+            name="rt"
             value={formData.rt}
             error={errors.rt}
             placeholder="000"
-            onChangeText={(v) => updateField('rt', v)}
+            onChange={updateField}
             keyboardType="numeric"
             maxLength={3}
           />
@@ -368,10 +470,11 @@ const FormBenchmarkScreen: React.FC = () => {
         <View style={{ flex: 1, marginLeft: 6 }}>
           <FormFieldRN
             label="RW"
+            name="rw"
             value={formData.rw}
             error={errors.rw}
             placeholder="000"
-            onChangeText={(v) => updateField('rw', v)}
+            onChange={updateField}
             keyboardType="numeric"
             maxLength={3}
           />
@@ -380,37 +483,77 @@ const FormBenchmarkScreen: React.FC = () => {
 
       <FormFieldRN
         label="Kelurahan/Desa"
+        name="kelurahan"
         value={formData.kelurahan}
         error={errors.kelurahan}
         placeholder="Masukkan kelurahan"
-        onChangeText={(v) => updateField('kelurahan', v)}
+        onChange={updateField}
       />
       <FormFieldRN
         label="Kecamatan"
+        name="kecamatan"
         value={formData.kecamatan}
         error={errors.kecamatan}
         placeholder="Masukkan kecamatan"
-        onChangeText={(v) => updateField('kecamatan', v)}
+        onChange={updateField}
       />
 
-      <DropdownPicker label="Kota/Kabupaten" fieldName="kota" options={KOTA_OPTIONS} />
-      <DropdownPicker label="Provinsi" fieldName="provinsi" options={PROVINSI_OPTIONS} />
+      <DropdownPicker
+        label="Kota/Kabupaten"
+        name="kota"
+        value={formData.kota}
+        options={KOTA_OPTIONS}
+        isOpen={showDropdown === 'kota'}
+        onToggle={handleToggleDropdown}
+        onSelect={handleSelectDropdown}
+      />
+      <DropdownPicker
+        label="Provinsi"
+        name="provinsi"
+        value={formData.provinsi}
+        options={PROVINSI_OPTIONS}
+        isOpen={showDropdown === 'provinsi'}
+        onToggle={handleToggleDropdown}
+        onSelect={handleSelectDropdown}
+      />
 
       {/* === Data Lainnya === */}
       <Text style={styles.sectionTitle}>Data Lainnya</Text>
 
-      <DropdownPicker label="Agama" fieldName="agama" options={AGAMA_OPTIONS} />
+      <DropdownPicker
+        label="Agama"
+        name="agama"
+        value={formData.agama}
+        options={AGAMA_OPTIONS}
+        isOpen={showDropdown === 'agama'}
+        onToggle={handleToggleDropdown}
+        onSelect={handleSelectDropdown}
+      />
       <DropdownPicker
         label="Status Perkawinan"
-        fieldName="statusPerkawinan"
+        name="statusPerkawinan"
+        value={formData.statusPerkawinan}
         options={STATUS_OPTIONS}
+        isOpen={showDropdown === 'statusPerkawinan'}
+        onToggle={handleToggleDropdown}
+        onSelect={handleSelectDropdown}
       />
-      <DropdownPicker label="Pekerjaan" fieldName="pekerjaan" options={PEKERJAAN_OPTIONS} />
+      <DropdownPicker
+        label="Pekerjaan"
+        name="pekerjaan"
+        value={formData.pekerjaan}
+        options={PEKERJAAN_OPTIONS}
+        isOpen={showDropdown === 'pekerjaan'}
+        onToggle={handleToggleDropdown}
+        onSelect={handleSelectDropdown}
+      />
 
       <RadioGroup
         label="Kewarganegaraan"
-        fieldName="kewarganegaraan"
+        name="kewarganegaraan"
+        value={formData.kewarganegaraan}
         options={['WNI', 'WNA']}
+        onSelect={updateField}
       />
 
       {/* === Kontak === */}
@@ -418,32 +561,39 @@ const FormBenchmarkScreen: React.FC = () => {
 
       <FormFieldRN
         label="No. HP"
+        name="noHp"
         value={formData.noHp}
         error={errors.noHp}
         placeholder="08xxxxxxxxxx"
-        onChangeText={(v) => updateField('noHp', v)}
+        onChange={updateField}
         keyboardType="phone-pad"
       />
       <FormFieldRN
         label="Email (opsional)"
+        name="email"
         value={formData.email}
         error={errors.email}
         placeholder="email@example.com"
-        onChangeText={(v) => updateField('email', v)}
+        onChange={updateField}
         keyboardType="email-address"
       />
       <FormFieldRN
         label="Nama Ibu Kandung"
+        name="namaIbuKandung"
         value={formData.namaIbuKandung}
         error={errors.namaIbuKandung}
         placeholder="Masukkan nama ibu kandung"
-        onChangeText={(v) => updateField('namaIbuKandung', v)}
+        onChange={updateField}
       />
 
       <DropdownPicker
         label="Penghasilan Bulanan"
-        fieldName="penghasilanBulanan"
+        name="penghasilanBulanan"
+        value={formData.penghasilanBulanan}
         options={PENGHASILAN_OPTIONS}
+        isOpen={showDropdown === 'penghasilanBulanan'}
+        onToggle={handleToggleDropdown}
+        onSelect={handleSelectDropdown}
       />
 
       {/* Submit */}
@@ -461,49 +611,6 @@ const FormBenchmarkScreen: React.FC = () => {
     </ScrollView>
   );
 };
-
-// Reusable Form Field Component
-const FormFieldRN: React.FC<{
-  label: string;
-  value: string;
-  error?: string;
-  placeholder?: string;
-  onChangeText: (text: string) => void;
-  keyboardType?: 'default' | 'numeric' | 'phone-pad' | 'email-address';
-  maxLength?: number;
-  multiline?: boolean;
-  numberOfLines?: number;
-}> = ({
-  label,
-  value,
-  error,
-  placeholder,
-  onChangeText,
-  keyboardType = 'default',
-  maxLength,
-  multiline = false,
-  numberOfLines = 1,
-}) => (
-  <View style={styles.fieldContainer}>
-    <Text style={styles.fieldLabel}>{label}</Text>
-    <TextInput
-      style={[
-        styles.textInput,
-        error ? styles.textInputError : null,
-        multiline ? { height: numberOfLines * 40, textAlignVertical: 'top' } : null,
-      ]}
-      value={value}
-      onChangeText={onChangeText}
-      placeholder={placeholder}
-      placeholderTextColor="#999"
-      keyboardType={keyboardType}
-      maxLength={maxLength}
-      multiline={multiline}
-      numberOfLines={numberOfLines}
-    />
-    {error && <Text style={styles.errorText}>{error}</Text>}
-  </View>
-);
 
 const styles = StyleSheet.create({
   container: {
