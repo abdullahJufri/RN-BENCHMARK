@@ -25,7 +25,7 @@ const App: React.FC = () => {
           component={DataBenchmarkScreen}
           options={{
             title: 'Data Masif',
-            headerTitle: '📊 Data Masif Benchmark',
+            headerTitle: '📊 Data Masif Benchmark RN',
             tabBarIcon: () => <Text style={{ fontSize: 20 }}>📊</Text>,
           }}
         />
@@ -34,7 +34,7 @@ const App: React.FC = () => {
           component={SearchBenchmarkScreen}
           options={{
             title: 'Search',
-            headerTitle: '🔍 Search Benchmark',
+            headerTitle: '🔍 Search Benchmark RN',
             tabBarIcon: () => <Text style={{ fontSize: 20 }}>🔍</Text>,
           }}
         />
@@ -43,7 +43,7 @@ const App: React.FC = () => {
           component={FormBenchmarkScreen}
           options={{
             title: 'Form',
-            headerTitle: '📝 Form Benchmark',
+            headerTitle: '📝 Form Benchmark RN',
             tabBarIcon: () => <Text style={{ fontSize: 20 }}>📝</Text>,
           }}
         />
